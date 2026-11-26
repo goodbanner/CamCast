@@ -2,7 +2,6 @@ package io.github.goodbanner.camprobe;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.text.util.Linkify;
 import android.widget.TextView;
 
 public class ProbeActivity extends Activity {
@@ -14,7 +13,6 @@ public class ProbeActivity extends Activity {
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         tv.setPadding(pad, pad, pad, pad);
         tv.setTextIsSelectable(true);
-        tv.setAutoLink(Linkify.ALL);
         tv.setText(
             "CamProbe — 相机参数探针\n\n"
             + "使用步骤：\n"
