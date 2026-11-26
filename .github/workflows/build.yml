@@ -21,7 +21,7 @@ jobs:
         with:
           gradle-version: "9.7.1"
 
-      - name: Build debug APK (retry on transient repo 429)
+      - name: Build debug APKs (retry on transient repo 429)
         shell: bash
         run: |
           for i in 1 2 3 4; do
@@ -36,9 +36,16 @@ jobs:
           done
           exit 1
 
-      - name: Upload APK
+      - name: Upload CamCast APK
         uses: actions/upload-artifact@v4
         with:
           name: CamCast-debug
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload CamProbe APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CamProbe-debug
+          path: probe/build/outputs/apk/debug/*.apk
           if-no-files-found: error

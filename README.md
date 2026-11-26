@@ -40,6 +40,14 @@ ffprobe rtmp://<你的服务器>/live/<key>
 
 `ffprobe` 输出应与设置面板逐项一致；分辨率档位报 `prepareVideo 失败` 说明该组合设备编码器不支持，换相邻档位。
 
+## CamProbe（LSPosed 相机参数探针）
+
+`probe/` 模块：hook 目标 app 的相机调用，把"它要了什么参数"全部打到 `logcat -s CamProbe`。
+
+抓取项：`openCamera` 的 cameraId、`ImageReader.newInstance` 的宽×高+格式（`0x22 PRIVATE`=GPU 消费，Java 层注不进）、`CaptureRequest` 的 AE 帧率区间+裁剪区、Camera1 的 `setPreviewSize/Format/FpsRange` 与 `setParameters(flatten)`、MediaRecorder 录像参数，全部附调用栈。
+
+安装：LSPosed 启用 CamProbe → 作用域勾目标 app → 重启目标 app → `adb logcat -s CamProbe`。
+
 ## 权限
 
 `CAMERA`、`RECORD_AUDIO`、`INTERNET`，运行时申请。

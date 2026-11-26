@@ -15,6 +15,8 @@ dependencyResolutionManagement {
                 includeGroupByRegex("com\\.github\\..*")
             }
         }
+        // Classic Xposed API (compileOnly) for the CamProbe module
+        maven("https://api.xposed.info/")
         google()
         mavenCentral()
     }
@@ -22,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "CamCast"
 include(":app")
+include(":probe")
