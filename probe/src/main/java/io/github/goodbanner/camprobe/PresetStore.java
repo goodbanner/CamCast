@@ -143,7 +143,7 @@ public class PresetStore {
                 sb.append("· ").append(pkg)
                     .append("  ").append(e.optInt("w", 0)).append("x").append(e.optInt("h", 0))
                     .append(" (").append(e.optString("size_src", "?")).append(")")
-                    .append("  fps=").append(e.optInt("fps", "-"))
+                    .append("  fps=").append(e.optString("fps", "-"))
                     .append(" (").append(e.optString("fps_src", "-")).append(")")
                     .append("  cam=").append(e.optString("cam", "-"));
                 String fmt = e.optString("fmt", "");
