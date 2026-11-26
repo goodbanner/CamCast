@@ -87,16 +87,6 @@ class MainActivity : Activity() {
         if (hasAllPermissions()) engineApply() else requestPermissions(permissions(), REQ_PERMISSIONS)
     }
 
-    override fun onResume() {
-        super.onResume()
-        glView.onResume()
-    }
-
-    override fun onPause() {
-        glView.onPause()
-        super.onPause()
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
