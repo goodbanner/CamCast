@@ -8,9 +8,15 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        // Resolve com.github.* (RootEncoder) from JitPack first so Maven Central
+        // is never probed for it; keeps central 429s from breaking those lookups.
+        maven("https://jitpack.io") {
+            content {
+                includeGroupByRegex("com\\.github\\..*")
+            }
+        }
         google()
         mavenCentral()
-        maven("https://jitpack.io")
     }
 }
 
