@@ -82,6 +82,10 @@ class StreamEngine(
         selectFrontCamera()
         prepared = true
         openPreviewIfPossible()
+        // 预览触发兜底：surface 可能稍后才就绪，holder 回调 + 焦点 + 定时重试三重回宿
+        glView.postDelayed({ Log.i(TAG, "retry300"); onSurfaceReady() }, 300)
+        glView.postDelayed({ Log.i(TAG, "retry1000"); onSurfaceReady() }, 1000)
+        glView.postDelayed({ Log.i(TAG, "retry2000"); onSurfaceReady() }, 2000)
         if (wasStreaming) {
             streaming = true
             rtmp.startStream(p.url)

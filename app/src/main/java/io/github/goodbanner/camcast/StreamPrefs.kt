@@ -67,8 +67,10 @@ data class StreamPrefs(
             return runCatching { fromJson(raw) }.getOrDefault(StreamPrefs())
         }
 
-        fun saveCurrent(c: Context, p: StreamPrefs) {
-            sp(c).edit().putString("current", p.toJson()).apply()
+        fun saveCurrent(c: Context, p: StreamPrefs): Boolean {
+            val ok = sp(c).edit().putString("current", p.toJson()).commit()
+            android.util.Log.i("CamCast", "saveCurrent commit=$ok")
+            return ok
         }
 
         fun presetNames(c: Context): Set<String> {

@@ -79,12 +79,24 @@ class MainActivity : Activity() {
         }
 
         glView.holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(h: SurfaceHolder) = engine.onSurfaceReady()
+            override fun surfaceCreated(h: SurfaceHolder) {
+                android.util.Log.i("CamCast", "surfaceCreated")
+                engine.onSurfaceReady()
+            }
             override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) = engine.onSurfaceReady()
-            override fun surfaceDestroyed(h: SurfaceHolder) = engine.onSurfaceGone()
+            override fun surfaceDestroyed(h: SurfaceHolder) {
+                android.util.Log.i("CamCast", "surfaceDestroyed")
+                engine.onSurfaceGone()
+            }
         })
 
         if (hasAllPermissions()) engineApply() else requestPermissions(permissions(), REQ_PERMISSIONS)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        android.util.Log.i("CamCast", "onWindowFocusChanged hasFocus=$hasFocus")
+        if (hasFocus && ::engine.isInitialized) engine.onSurfaceReady()
     }
 
     override fun onRequestPermissionsResult(
