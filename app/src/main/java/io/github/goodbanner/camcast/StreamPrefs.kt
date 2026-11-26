@@ -70,6 +70,10 @@ data class StreamPrefs(
         fun saveCurrent(c: Context, p: StreamPrefs): Boolean {
             val ok = sp(c).edit().putString("current", p.toJson()).commit()
             android.util.Log.i("CamCast", "saveCurrent commit=$ok")
+            runCatching {
+                java.io.File(c.filesDir, "save_ok.txt")
+                    .writeText("commit=$ok t=${System.currentTimeMillis()}")
+            }
             return ok
         }
 

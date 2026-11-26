@@ -52,7 +52,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         glView = OpenGlView(this)
-        root.addView(glView, LinearLayout.LayoutParams(0, 0, 1f))
+        root.addView(glView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,12 +70,17 @@ class MainActivity : Activity() {
             panel,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         )
-        root.addView(scroll, LinearLayout.LayoutParams(0, 0, 1.2f))
+        root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.2f))
         setContentView(root)
 
         engine = StreamEngine(glView) { msg ->
             status.text = msg
             btnStream.text = if (engine.streaming) "停止推流" else "开始推流"
+            // 文件埋点：绕开本机 logd 按 UID 限速
+            runCatching {
+                java.io.File(filesDir, "camcast.log")
+                    .appendText("${System.currentTimeMillis() % 1000000} $msg\n")
+            }
         }
 
         glView.holder.addCallback(object : SurfaceHolder.Callback {
