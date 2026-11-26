@@ -1,5 +1,8 @@
 package io.github.goodbanner.camprobe;
 
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraCaptureSession;
@@ -11,8 +14,10 @@ import android.media.MediaRecorder;
 import android.util.Log;
 import android.util.Range;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -23,36 +28,58 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 /**
  * CamProbe: 记录目标 app 向相机子系统请求的全部关键参数。
  *
- * 输出双通道：logcat（tag=CamProbe，主采集口）+ XposedBridge.log（LSPosed 日志）。
+ * 输出三通道:
+ *   1. logcat tag=CamProbe（主采集口，带调用栈）
+ *   2. XposedBridge.log（LSPosed 日志）
+ *   3. 显式广播回 CamProbe app 的 PresetReceiver，落盘为 CamCast 预设数据，
+ *      由 ProbeActivity 的「导出到 CamCast」按钮一键推送。
+ *
  * 框架类 hook 每进程只装一次；每个 app 进程独立 fork，静态变量天然按进程隔离。
  */
 public class Hook implements IXposedHookLoadPackage {
 
     private static final String TAG = "CamProbe";
+    private static final String ACTION_PROBE = "io.github.goodbanner.camprobe.ACTION_PROBE";
+    private static final String DST_CLASS = "io.github.goodbanner.camprobe.PresetReceiver";
+    private static final String DST_PKG = "io.github.goodbanner.camprobe";
+
     private static volatile boolean frameworkHooked = false;
+    private static volatile Context appCtx;
+    private static final Map<String, String> lastSent = new HashMap<>();
 
     @Override
     public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpp) {
         if (lpp.packageName == null) return;
-        if (lpp.packageName.equals("io.github.goodbanner.camprobe")) return;
+        if (lpp.packageName.equals(DST_PKG)) return;
         if (frameworkHooked) return;
         frameworkHooked = true;
 
         final String pkg = lpp.packageName;
         final ClassLoader cl = lpp.classLoader;
-        emit(pkg + " installed camera probes (v0.1)");
+        emit(pkg + " installed camera probes (v0.2)");
+
+        // 拿应用 Context 用于 sendBroadcast（attach 早于任何相机调用）
+        try {
+            XposedHelpers.findAndHookMethod("android.app.Application", cl, "attach", Context.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam p) {
+                        appCtx = (Context) p.args[0];
+                    }
+                });
+        } catch (Throwable ignored) {
+        }
 
         // ================= Camera2 =================
 
-        // 1. 打开哪个摄像头
         hookAll(cl, "android.hardware.camera2.CameraManager", "openCamera", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
                 emit("[openCamera2] id=" + p.args[0] + " pkg=" + pkg + "\n" + caller());
+                send(pkg, "cam", String.valueOf(p.args[0]), 0, 0, "openCamera2");
             }
         });
 
-        // 2. 消费帧的宽/高/格式（最核心）
         hookAll(cl, "android.media.ImageReader", "newInstance", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
@@ -63,10 +90,10 @@ public class Hook implements IXposedHookLoadPackage {
                 emit(String.format(Locale.US,
                     "[ImageReader] %dx%d format=0x%x(%s) maxImgs=%d pkg=%s\n%s",
                     w, h, fmt, fmtName(fmt), max, pkg, caller()));
+                send(pkg, "image", fmtName(fmt), w, h, "ImageReader");
             }
         });
 
-        // 3. 会话输出 surface 列表（尺寸未知，给出数量与对象信息）
         hookAll(cl, "android.hardware.camera2.CameraDevice", "createCaptureSession", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
@@ -74,7 +101,6 @@ public class Hook implements IXposedHookLoadPackage {
             }
         });
 
-        // 4. 帧率区间 + 裁剪区域（CaptureRequest 关键参数）
         XC_MethodHook reqHook = new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
@@ -92,7 +118,10 @@ public class Hook implements IXposedHookLoadPackage {
                     }
                     StringBuilder sb = new StringBuilder("[");
                     Range<Integer> fps = req.get(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE);
-                    if (fps != null) sb.append("AE_FPS=").append(fps);
+                    if (fps != null) {
+                        sb.append("AE_FPS=").append(fps);
+                        send(pkg, "fps", String.valueOf(fps.getUpper()), 0, 0, "AE_FPS");
+                    }
                     Rect crop = req.get(CaptureRequest.SCALER_CROP_REGION);
                     if (crop != null) sb.append(" crop=").append(crop.toShortString());
                     sb.append("] pkg=").append(pkg);
@@ -114,6 +143,7 @@ public class Hook implements IXposedHookLoadPackage {
             protected void beforeHookedMethod(MethodHookParam p) {
                 String id = p.args.length > 0 ? String.valueOf(p.args[0]) : "default";
                 emit("[openCamera1] id=" + id + " pkg=" + pkg + "\n" + caller());
+                send(pkg, "cam", id, 0, 0, "openCamera1");
             }
         });
 
@@ -131,7 +161,10 @@ public class Hook implements IXposedHookLoadPackage {
         hookAll(cl, "android.hardware.Camera$Parameters", "setPreviewSize", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
-                emit("[setPreviewSize] " + p.args[0] + "x" + p.args[1] + " pkg=" + pkg + "\n" + caller());
+                int w = (Integer) p.args[0];
+                int h = (Integer) p.args[1];
+                emit("[setPreviewSize] " + w + "x" + h + " pkg=" + pkg + "\n" + caller());
+                send(pkg, "size", "", w, h, "setPreviewSize");
             }
         });
 
@@ -147,23 +180,28 @@ public class Hook implements IXposedHookLoadPackage {
         hookAll(cl, "android.hardware.Camera$Parameters", "setPreviewFpsRange", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
-                emit("[setPreviewFpsRange] " + p.args[0] + "-" + p.args[1] + " pkg=" + pkg);
+                int hi = (Integer) p.args[1];
+                emit("[setPreviewFpsRange] " + p.args[0] + "-" + hi + " pkg=" + pkg);
+                send(pkg, "fps", String.valueOf(hi), 0, 0, "setPreviewFpsRange");
             }
         });
 
         // ================= MediaRecorder（录像） =================
 
-        XC_MethodHook recSize = new XC_MethodHook() {
+        hookAll(cl, "android.media.MediaRecorder", "setVideoSize", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
-                emit("[Recorder.setVideoSize] " + p.args[0] + "x" + p.args[1] + " pkg=" + pkg);
+                int w = (Integer) p.args[0];
+                int h = (Integer) p.args[1];
+                emit("[Recorder.setVideoSize] " + w + "x" + h + " pkg=" + pkg);
+                send(pkg, "size", "", w, h, "Recorder");
             }
-        };
-        hookAll(cl, "android.media.MediaRecorder", "setVideoSize", recSize);
+        });
         hookAll(cl, "android.media.MediaRecorder", "setVideoFrameRate", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam p) {
                 emit("[Recorder.setVideoFrameRate] " + p.args[0] + " pkg=" + pkg);
+                send(pkg, "fps", String.valueOf(p.args[0]), 0, 0, "VideoFrameRate");
             }
         });
         hookAll(cl, "android.media.MediaRecorder", "setVideoEncodingBitRate", new XC_MethodHook() {
@@ -196,6 +234,31 @@ public class Hook implements IXposedHookLoadPackage {
         try {
             XposedBridge.log(TAG + ": " + msg);
         } catch (Throwable ignored) {
+        }
+    }
+
+    /** 把探测增量广播回 CamProbe app 落盘；同 (pkg,kind) 值未变则去重不发。 */
+    private static void send(String pkg, String kind, String val, int w, int h, String src) {
+        Context ctx = appCtx;
+        if (ctx == null) return;
+        String fingerprint = val + "|" + w + "x" + h + "|" + src;
+        synchronized (lastSent) {
+            String key = pkg + "|" + kind;
+            if (fingerprint.equals(lastSent.get(key))) return;
+            lastSent.put(key, fingerprint);
+        }
+        try {
+            Intent i = new Intent(ACTION_PROBE);
+            i.setComponent(new ComponentName(DST_PKG, DST_CLASS));
+            i.putExtra("pkg", pkg)
+                .putExtra("kind", kind)
+                .putExtra("val", val)
+                .putExtra("w", w)
+                .putExtra("h", h)
+                .putExtra("src", src);
+            ctx.sendBroadcast(i);
+        } catch (Throwable t) {
+            // 接收端没装等情况：logcat 通道仍在，不打断目标 app
         }
     }
 

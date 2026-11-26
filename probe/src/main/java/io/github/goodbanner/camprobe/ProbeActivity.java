@@ -1,39 +1,138 @@
 package io.github.goodbanner.camprobe;
 
 import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.graphics.Typeface;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
+import org.json.JSONObject;
+
 public class ProbeActivity extends Activity {
+
+    private static final String CAMCAST_PKG = "io.github.goodbanner.camcast";
+    private static final String CAMCAST_ACTION = "io.github.goodbanner.camcast.ACTION_IMPORT_PRESETS";
+    private static final String CAMCAST_CLASS = "io.github.goodbanner.camcast.PresetReceiver";
+    private static final String DEFAULT_URL = "rtmp://192.168.1.50/live/cam";
+
+    private EditText eUrl;
+    private TextView status;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        TextView tv = new TextView(this);
-        int pad = (int) (16 * getResources().getDisplayMetrics().density);
-        tv.setPadding(pad, pad, pad, pad);
-        tv.setTextIsSelectable(true);
-        tv.setText(
-            "CamProbe — 相机参数探针\n\n"
-            + "使用步骤：\n"
-            + "1. 打开 LSPosed Manager → 模块 → 启用 CamProbe\n"
-            + "2. 在作用域里勾选要抓取的目标 app（可多选）\n"
-            + "3. 强行停止目标 app 后重新打开，走一遍它的相机流程\n"
-            + "   （开预览 / 切前后摄 / 拍照 / 录像 各来一次）\n"
-            + "4. 采集结果：\n"
-            + "   adb logcat -s CamProbe\n"
-            + "   也可在 LSPosed Manager → 日志 里看 XposedBridge 日志\n\n"
-            + "抓取项：\n"
-            + "  · openCamera 的 cameraId（前置=1 / 后置=0，视机型）\n"
-            + "  · ImageReader.newInstance 的宽×高 + 像素格式（0x23=YUV_420_888，"
-            + "0x22=PRIVATE 表示 GPU 消费、Java 层注不进去）\n"
-            + "  · CaptureRequest 的 AE 帧率区间 + 裁剪区域\n"
-            + "  · Camera1 的 setPreviewSize / setPreviewFormat / setPreviewFpsRange / setParameters(flat)\n"
-            + "  · MediaRecorder 的视频尺寸/帧率/码率\n\n"
-            + "局限：纯 View 预览（无 ImageReader）的 surface 尺寸取不到，"
-            + "从 ImageReader 项或日志里的调用栈推断。\n\n"
-            + "仓库: github.com/goodbanner/CamCast"
-        );
-        setContentView(tv);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        panel.setPadding(pad, pad, pad, pad);
+
+        TextView title = new TextView(this);
+        title.setText("CamProbe — 相机参数探针");
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        panel.addView(title);
+
+        status = new TextView(this);
+        status.setText("探测数据:\n" + PresetStore.summary(this));
+        status.setPadding(0, dp(8), 0, dp(8));
+        panel.addView(status);
+
+        TextView urlLabel = label("导出时使用的推流地址:");
+        panel.addView(urlLabel);
+        eUrl = new EditText(this);
+        eUrl.setSingleLine(true);
+        eUrl.setText(DEFAULT_URL);
+        eUrl.setHint("rtmp://...");
+        panel.addView(eUrl);
+
+        Button export = new Button(this);
+        export.setText("导出到 CamCast");
+        export.setAllCaps(false);
+        export.setOnClickListener(v -> doExport());
+        panel.addView(export, matchWrap());
+
+        TextView help = new TextView(this);
+        help.setTextSize(12);
+        help.setPadding(0, dp(12), 0, 0);
+        help.setText(
+            "流程:\n"
+            + "1. LSPosed 启用本模块，作用域勾目标 app\n"
+            + "2. 强停并重开目标 app，走完相机流程\n"
+            + "   (预览/切前后摄/拍照/录像)\n"
+            + "3. 回到这里看「探测数据」刷新\n"
+            + "4. 填推流地址 → 点「导出到 CamCast」\n"
+            + "5. CamCast 里点「加载预设」(名字=包名)\n\n"
+            + "logcat 同步输出: adb logcat -s CamProbe\n"
+            + "仓库: github.com/goodbanner/CamCast");
+        panel.addView(help);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(panel, new ScrollView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        setContentView(scroll);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refresh();
+    }
+
+    private void refresh() {
+        status.setText("探测数据:\n" + PresetStore.summary(this));
+    }
+
+    private void doExport() {
+        String url = eUrl.getText().toString().trim();
+        if (url.isEmpty()) url = DEFAULT_URL;
+        try {
+            JSONObject presets = PresetStore.presets(this, url);
+            if (presets.length() == 0) {
+                status.setText("没有可导出的数据（或都缺分辨率）。\n先完成目标 app 的相机流程。\n\n"
+                    + PresetStore.summary(this));
+                return;
+            }
+            Intent i = new Intent(CAMCAST_ACTION);
+            i.setComponent(new ComponentName(CAMCAST_PKG, CAMCAST_CLASS));
+            if (getPackageManager().queryBroadcastReceivers(i, 0).isEmpty()) {
+                status.setText("CamCast 接收器未找到：确认 CamCast 已安装。\n\n"
+                    + PresetStore.summary(this));
+                return;
+            }
+            i.putExtra("presets_json", presets.toString());
+            sendBroadcast(i);
+            status.setText("已导出 " + presets.length() + " 个预设到 CamCast\n"
+                + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n"
+                + PresetStore.summary(this));
+        } catch (Exception e) {
+            status.setText("导出失败: " + e + "\n\n" + PresetStore.summary(this));
+        }
+    }
+
+    private TextView label(String s) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setPadding(0, dp(10), 0, dp(2));
+        return t;
+    }
+
+    private LinearLayout.LayoutParams matchWrap() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(10);
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        return lp;
+    }
+
+    private int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density);
     }
 }

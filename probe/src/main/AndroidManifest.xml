@@ -10,6 +10,14 @@
             android:value="Probe camera parameters (size/format/fps/id) requested by target apps" />
         <meta-data android:name="xposedminversion" android:value="53" />
 
+        <receiver
+            android:name=".PresetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.goodbanner.camprobe.ACTION_PROBE" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".ProbeActivity"
             android:exported="true">

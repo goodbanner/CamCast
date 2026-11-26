@@ -48,7 +48,13 @@ ffprobe rtmp://<你的服务器>/live/<key>
 
 安装：LSPosed 启用 CamProbe → 作用域勾目标 app → 重启目标 app → `adb logcat -s CamProbe`。
 
-### 探测数据 → CamCast 预设
+### 探测数据 → CamCast 预设（App 内一键）
+
+目标 app 走完相机流程 → 打开 **CamProbe**，看「探测数据」刷新 → 填推流地址 → 点**「导出到 CamCast」** → CamCast 自动收到并合并预设（Toast 提示数量）→ CamCast 里预设名填包名 → 「加载预设」。
+
+链路：Hook(目标进程) --广播--> PresetReceiver 落盘 → ProbeActivity 导出 --广播--> CamCast.PresetReceiver 合并。保持 CamProbe 至少启动过一次（未启动过的 app 收不到广播）。
+
+### 探测数据 → CamCast 预设（离线脚本，备用）
 
 ```bash
 adb logcat -s CamCapture -d > probe.txt      # 实际 tag 是 CamProbe

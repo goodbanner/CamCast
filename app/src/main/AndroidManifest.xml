@@ -12,6 +12,14 @@
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <receiver
+            android:name=".PresetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.goodbanner.camcast.ACTION_IMPORT_PRESETS" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

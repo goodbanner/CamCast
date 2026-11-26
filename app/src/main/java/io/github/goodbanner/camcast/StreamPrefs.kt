@@ -77,6 +77,7 @@ data class StreamPrefs(
             return ok
         }
 
+        @JvmStatic
         fun presetNames(c: Context): Set<String> {
             val out = sortedSetOf<String>()
             for (k in presetsObject(c).keys()) out.add(k)
@@ -100,6 +101,20 @@ data class StreamPrefs(
         fun importPresets(c: Context, json: String) {
             JSONObject(json) // 校验，非法直接抛
             sp(c).edit().putString("presets", json).apply()
+        }
+
+        /** 合并（不覆盖既有预设），返回新增/覆盖数量；供 CamProbe 导入广播调用。 */
+        @JvmStatic
+        fun mergePresets(c: Context, json: String): Int {
+            val incoming = JSONObject(json) // 校验
+            val o = presetsObject(c)
+            var n = 0
+            for (k in incoming.keys()) {
+                o.put(k, incoming.getJSONObject(k))
+                n++
+            }
+            sp(c).edit().putString("presets", o.toString()).commit()
+            return n
         }
     }
 }
