@@ -48,6 +48,19 @@ ffprobe rtmp://<你的服务器>/live/<key>
 
 安装：LSPosed 启用 CamProbe → 作用域勾目标 app → 重启目标 app → `adb logcat -s CamProbe`。
 
+### 探测数据 → CamCast 预设
+
+```bash
+adb logcat -s CamCapture -d > probe.txt      # 实际 tag 是 CamProbe
+adb logcat -s CamProbe -d > probe.txt
+python3 tools/probe2preset.py probe.txt -o camcast-presets.json
+adb push camcast-presets.json /sdcard/Android/data/io.github.goodbanner.camcast/files/camcast-presets.json
+```
+
+CamCast 里点「导入预设」→ 预设名填目标包名 → 「加载预设」→ 参数自动填入并应用。
+
+映射：`ImageReader w×h → width/height`（优先）、`AE_FPS 上界 → fps`；码率/关键帧不走相机 API，探测不到，用默认值（2000k/1s），装完界面里手调。`--exact` 保持原始分辨率，`--url` 统一填推流地址。
+
 ## 权限
 
 `CAMERA`、`RECORD_AUDIO`、`INTERNET`，运行时申请。
