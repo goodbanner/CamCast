@@ -59,7 +59,7 @@ data class StreamPrefs(
             c.getSharedPreferences(STORE, Context.MODE_PRIVATE)
 
         private fun presetsObject(c: Context): JSONObject = runCatching {
-            JSONObject(sp(c).getString("presets") ?: "{}")
+            JSONObject(sp(c).getString("presets", null) ?: "{}")
         }.getOrDefault(JSONObject())
 
         fun load(c: Context): StreamPrefs {
