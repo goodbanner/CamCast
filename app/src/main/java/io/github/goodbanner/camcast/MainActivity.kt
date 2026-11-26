@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.SurfaceHolder
-import android.view.SurfaceView
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -17,11 +16,12 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import com.pedro.library.view.OpenGlView
 import java.io.File
 
 class MainActivity : Activity() {
 
-    private lateinit var surfaceView: SurfaceView
+    private lateinit var glView: OpenGlView
     private lateinit var engine: StreamEngine
     private lateinit var status: TextView
 
@@ -51,8 +51,8 @@ class MainActivity : Activity() {
         prefs = StreamPrefs.load(this)
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        surfaceView = SurfaceView(this)
-        root.addView(surfaceView, LinearLayout.LayoutParams(0, 0, 1f))
+        glView = OpenGlView(this)
+        root.addView(glView, LinearLayout.LayoutParams(0, 0, 1f))
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -73,18 +73,28 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(0, 0, 1.2f))
         setContentView(root)
 
-        engine = StreamEngine(this, surfaceView) { msg ->
+        engine = StreamEngine(glView) { msg ->
             status.text = msg
             btnStream.text = if (engine.streaming) "停止推流" else "开始推流"
         }
 
-        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+        glView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(h: SurfaceHolder) = engine.onSurfaceReady()
             override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, ht: Int) = engine.onSurfaceReady()
             override fun surfaceDestroyed(h: SurfaceHolder) = engine.onSurfaceGone()
         })
 
         if (hasAllPermissions()) engineApply() else requestPermissions(permissions(), REQ_PERMISSIONS)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        glView.onResume()
+    }
+
+    override fun onPause() {
+        glView.onPause()
+        super.onPause()
     }
 
     override fun onRequestPermissionsResult(
