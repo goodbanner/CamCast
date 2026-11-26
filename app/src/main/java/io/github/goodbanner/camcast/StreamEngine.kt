@@ -4,29 +4,30 @@ import android.content.Context
 import android.media.MediaCodecInfo
 import android.os.Handler
 import android.os.Looper
-import android.view.SurfaceView
 import com.pedro.common.ConnectChecker
 import com.pedro.library.rtmp.RtmpCamera2
+import com.pedro.library.view.OpenGlView
 
 /**
- * RootEncoder 封装：参数应用、预览生命周期、推流控制、断线重连。
+ * RootEncoder（jitpack 2.8.2 AAR）封装：参数应用、预览生命周期、推流控制、断线重连。
  *
- * 硬顺序（来自 Camera2Base/StreamBase 源码注释）：
- *   prepareVideo/prepareAudio → startPreview → startStream
- * 任何参数变更都必须整体重走一遍。
+ * 类层次（以 AAR 实际字节码为准）：RtmpCamera2 → Camera2Base → Object
+ * （StreamBase 是平行基类，不在本链上，其 SurfaceView 版 startPreview 不可用）。
  *
- * 注意：RtmpCamera2 的可调 API 由 Java 子类 Camera2Base 提供，参数顺序为
+ * 可用 API 与参数顺序（Camera2Base.java）：
  *   prepareVideo(width, height, fps, bitrate, iFrameInterval, rotation, profile, level)
  *   prepareAudio(bitrate, sampleRate, isStereo)
- * 与 StreamBase.kt 的 Kotlin 重载顺序不同，调用一律使用上述 Java 顺序。
+ *   startPreview()            —— 渲染到构造器传入的 OpenGlView，需先 prepareVideo
+ *   stopPreview()             —— 推流中调用被忽略（源码内置保护）
+ *
+ * 硬顺序：prepareVideo/prepareAudio → startPreview → startStream
  */
 class StreamEngine(
-    context: Context,
-    private val surfaceView: SurfaceView,
+    private val glView: OpenGlView,
     private val onEvent: (String) -> Unit,
 ) : ConnectChecker {
 
-    private val rtmp = RtmpCamera2(context.applicationContext, this)
+    private val rtmp = RtmpCamera2(glView, this)
     private val handler = Handler(Looper.getMainLooper())
 
     var prefs: StreamPrefs = StreamPrefs()
@@ -109,20 +110,20 @@ class StreamEngine(
         }
     }
 
-    /** SurfaceView 变为可用时由 Activity 调用。 */
+    /** SurfaceView（OpenGlView 底层）可用时由 Activity 调用。 */
     fun onSurfaceReady() {
         if (prepared) openPreviewIfPossible()
     }
 
-    /** SurfaceView 被销毁（退后台/熄屏）时由 Activity 调用。 */
+    /** Surface 被销毁（退后台/熄屏）时由 Activity 调用；推流中内部会忽略。 */
     fun onSurfaceGone() {
         if (rtmp.isOnPreview) runCatching { rtmp.stopPreview() }
     }
 
     private fun openPreviewIfPossible() {
         if (!prepared || rtmp.isOnPreview) return
-        if (!surfaceView.holder.surface.isValid) return
-        runCatching { rtmp.startPreview(surfaceView) }
+        if (!glView.holder.surface.isValid) return
+        runCatching { rtmp.startPreview() }
             .onFailure { emit("startPreview 失败: ${it.message}") }
     }
 
