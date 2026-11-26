@@ -6,7 +6,6 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
-import android.media.ImageFormat;
 import android.media.ImageReader;
 import android.media.MediaRecorder;
 import android.util.Log;
@@ -219,8 +218,9 @@ public class Hook implements IXposedHookLoadPackage {
     }
 
     private static String fmtName(int f) {
-        if (f == ImageFormat.JPEG) return "JPEG";
-        if (f == ImageFormat.YUV_420_888) return "YUV_420_888";
+        // 魔数字对照 android.media.ImageFormat（api-82.jar 的 android 桩会遮蔽该类，故不 import）
+        if (f == 0x100) return "JPEG";
+        if (f == 0x23) return "YUV_420_888";
         if (f == 0x22) return "PRIVATE(GPU消费,Java层不可注入)";
         if (f == 0x21) return "IMPLEMENTATION_DEFINED";
         if (f == 17) return "NV21";
