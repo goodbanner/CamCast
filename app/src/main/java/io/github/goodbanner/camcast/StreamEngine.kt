@@ -11,9 +11,14 @@ import com.pedro.library.rtmp.RtmpCamera2
 /**
  * RootEncoder 封装：参数应用、预览生命周期、推流控制、断线重连。
  *
- * 硬顺序（来自 StreamBase 源码注释）：
+ * 硬顺序（来自 Camera2Base/StreamBase 源码注释）：
  *   prepareVideo/prepareAudio → startPreview → startStream
  * 任何参数变更都必须整体重走一遍。
+ *
+ * 注意：RtmpCamera2 的可调 API 由 Java 子类 Camera2Base 提供，参数顺序为
+ *   prepareVideo(width, height, fps, bitrate, iFrameInterval, rotation, profile, level)
+ *   prepareAudio(bitrate, sampleRate, isStereo)
+ * 与 StreamBase.kt 的 Kotlin 重载顺序不同，调用一律使用上述 Java 顺序。
  */
 class StreamEngine(
     context: Context,
@@ -40,17 +45,11 @@ class StreamEngine(
         prefs = p
         try {
             if (wasStreaming) rtmp.stopStream()
-            if (rtmp.isOnPreview) rtmp.stopPreview(true)
+            if (rtmp.isOnPreview) rtmp.stopPreview()
 
             val okVideo = rtmp.prepareVideo(
-                width = p.width,
-                height = p.height,
-                bitrate = p.bitrateKbps * 1000,
-                fps = p.fps,
-                iFrameInterval = p.gopSec,
-                rotation = p.rotation,
-                profile = avcProfile(p.profile),
-                level = -1,
+                p.width, p.height, p.fps, p.bitrateKbps * 1000,
+                p.gopSec, p.rotation, avcProfile(p.profile), -1
             )
             if (!okVideo) {
                 emit("prepareVideo 失败：${p.width}x${p.height}@${p.fps} 设备不支持，换相邻档位")
@@ -58,7 +57,7 @@ class StreamEngine(
             }
 
             if (p.audioOn) {
-                val okAudio = rtmp.prepareAudio(p.sampleRate, true, p.audioBitrateKbps * 1000)
+                val okAudio = rtmp.prepareAudio(p.audioBitrateKbps * 1000, p.sampleRate, true)
                 if (!okAudio) {
                     emit("prepareAudio 失败：${p.sampleRate}/${p.audioBitrateKbps}k 不支持")
                     return false
@@ -117,13 +116,13 @@ class StreamEngine(
 
     /** SurfaceView 被销毁（退后台/熄屏）时由 Activity 调用。 */
     fun onSurfaceGone() {
-        if (rtmp.isOnPreview) runCatching { rtmp.stopPreview(true) }
+        if (rtmp.isOnPreview) runCatching { rtmp.stopPreview() }
     }
 
     private fun openPreviewIfPossible() {
         if (!prepared || rtmp.isOnPreview) return
         if (!surfaceView.holder.surface.isValid) return
-        runCatching { rtmp.startPreview(surfaceView, false) }
+        runCatching { rtmp.startPreview(surfaceView) }
             .onFailure { emit("startPreview 失败: ${it.message}") }
     }
 
