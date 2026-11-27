@@ -49,7 +49,7 @@ public class ProbeActivity extends Activity {
         panel.addView(urlLabel);
         eUrl = new EditText(this);
         eUrl.setSingleLine(true);
-        eUrl.setText(DEFAULT_URL);
+        eUrl.setText(PresetStore.loadExportUrl(this));
         eUrl.setHint("rtmp://...");
         panel.addView(eUrl);
 
@@ -93,6 +93,9 @@ public class ProbeActivity extends Activity {
     private void doExport() {
         String url = eUrl.getText().toString().trim();
         if (url.isEmpty()) url = DEFAULT_URL;
+        // 必须保存：反向拉取路径（PresetProvider）用 loadExportUrl() 取这个值，
+        // 不保存就永远回落到 DEFAULT_URL(192.168.1.50)，覆盖广播里的正确 URL。
+        PresetStore.saveExportUrl(this, url);
         try {
             JSONObject presets = PresetStore.presets(this, url);
             if (presets.length() == 0) {
