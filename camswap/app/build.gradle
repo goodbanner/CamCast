@@ -17,16 +17,25 @@ android {
 
     signingConfigs {
         release {
-            Properties properties = new Properties()
-            if (rootProject.file("local.properties").exists()) {
-                properties.load(rootProject.file("local.properties").newDataInputStream())
+            // env 优先（CI Secrets）；其次 local.properties；都没有则不签名
+            String ksPath = System.getenv("KEYSTORE_PATH")
+            if (ksPath == null) {
+                Properties properties = new Properties()
+                if (rootProject.file("local.properties").exists()) {
+                    properties.load(rootProject.file("local.properties").newDataInputStream())
+                }
+                if (properties.containsKey("storeFile")) {
+                    ksPath = properties.getProperty("storeFile")
+                    storePassword = properties.getProperty("storePassword")
+                    keyAlias = properties.getProperty("keyAlias")
+                    keyPassword = properties.getProperty("keyPassword")
+                }
             }
-
-            if (properties.containsKey("storeFile")) {
-                storeFile file(properties.getProperty("storeFile"))
-                storePassword properties.getProperty("storePassword")
-                keyAlias properties.getProperty("keyAlias")
-                keyPassword properties.getProperty("keyPassword")
+            if (ksPath != null) {
+                storeFile file(ksPath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: storePassword
+                keyAlias = System.getenv("KEY_ALIAS") ?: keyAlias
+                keyPassword = System.getenv("KEY_PASSWORD") ?: keyPassword
             }
         }
     }
@@ -70,10 +79,9 @@ android {
 
     buildTypes {
         release {
+            // 有证书则签，无则不签（unsigned，由用户自签）
             if (signingConfigs.release.storeFile) {
                 signingConfig signingConfigs.release
-            } else {
-                signingConfig signingConfigs.debug
             }
             minifyEnabled false
             shrinkResources false
@@ -151,7 +159,6 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer-hls:1.6.0"
     implementation "androidx.media3:media3-exoplayer-dash:1.6.0"
     implementation "androidx.media3:media3-datasource:1.6.0"
-    // RTMP: media3-exoplayer-rtmp requires native libs and may not be available
-    // on all mirrors. RTMP is handled via reflection in ExoPlayerBackend with
-    // graceful fallback to ProgressiveMediaSource.
+    // RTMP has no official media3 artifact. Use RTSP (media3-exoplayer-rtsp above):
+    // push CamCast -> nginx RTMP, then relay RTMP -> RTSP via ffmpeg/mediamtx.
 }

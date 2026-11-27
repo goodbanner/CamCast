@@ -21,31 +21,37 @@ jobs:
         with:
           gradle-version: "9.7.1"
 
-      - name: Build debug APKs (retry on transient repo 429)
+      - name: Decode release keystore (if secret configured)
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.jks
+
+      - name: Build debug + release APKs
         shell: bash
+        env:
+          KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH != '' && '/tmp/release.jks' || '' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          for i in 1 2 3 4; do
+          for i in 1 2 3; do
             echo "== attempt $i =="
-            if gradle assembleDebug --no-daemon; then
+            if gradle assembleDebug assembleRelease --no-daemon; then
               exit 0
             fi
-            if [ "$i" -lt 4 ]; then
-              echo "build failed, retrying in 60s..."
-              sleep 60
-            fi
+            if [ "$i" -lt 3 ]; then sleep 60; fi
           done
           exit 1
 
-      - name: Upload CamCast APK
+      - name: Upload CamCast debug APK
         uses: actions/upload-artifact@v4
         with:
           name: CamCast-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      - name: Upload CamProbe APK
+      - name: Upload CamCast release APK
         uses: actions/upload-artifact@v4
         with:
-          name: CamProbe-debug
-          path: probe/build/outputs/apk/debug/*.apk
+          name: CamCast-release
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
