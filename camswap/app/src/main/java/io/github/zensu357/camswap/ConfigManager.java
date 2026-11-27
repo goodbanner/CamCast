@@ -19,6 +19,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class ConfigManager {
     public static final String CONFIG_FILE_NAME = "cs_config.json";
+    /**
+     * 单一配置文件路径。DCIM 下的主配置对目标 app 是 EACCES（scoped storage
+     * 跨 uid + 非媒体文件），/data/local/tmp 目录 others 可穿越(0711)、
+     * 文件属主为本 app 时 owner 可写、others 可读，读写双方都通。
+     */
+    public static final String CONFIG_FILE = "/data/local/tmp/cs_config.json";
     public static final String DEFAULT_CONFIG_DIR;
     static {
         String path;
@@ -331,6 +337,7 @@ public class ConfigManager {
         // Scoped storage (Android 11+): target apps get EACCES opening the primary
         // path (cross-uid non-media file under DCIM). Try world-readable fallbacks.
         File[] candidates = new File[] {
+                new File(CONFIG_FILE),
                 new File(DEFAULT_CONFIG_DIR, CONFIG_FILE_NAME),
                 new File("/data/local/tmp/cs_config.json"),
                 new File("/data/local/tmp/CamSwap/cs_config.json"),
@@ -449,11 +456,11 @@ public class ConfigManager {
     }
 
     private void save(JSONObject snapshot) {
-        File dir = new File(DEFAULT_CONFIG_DIR);
-        if (!dir.exists()) {
+        File configFile = new File(CONFIG_FILE);
+        File dir = configFile.getParentFile();
+        if (dir != null && !dir.exists()) {
             dir.mkdirs();
         }
-        File configFile = new File(dir, CONFIG_FILE_NAME);
         try {
             try (FileOutputStream fos = new FileOutputStream(configFile)) {
                 fos.write(snapshot.toString(4).getBytes(StandardCharsets.UTF_8));
