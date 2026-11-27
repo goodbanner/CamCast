@@ -29,7 +29,10 @@ public final class PresetPull {
             try {
                 Uri uri = Uri.parse("content://" + AUTH + "/presets");
                 c = cr.query(uri, null, null, null, null);
-                if (c == null || !c.moveToFirst()) return;
+                if (c == null || !c.moveToFirst()) {
+                    Log.i("CamCast", "preset pull: empty cursor (probe 未装/无数据/<queries> 缺声明)");
+                    return;
+                }
                 String json = c.getString(c.getColumnIndexOrThrow("presets"));
                 if (json == null || json.isEmpty()) return;
                 final int n = StreamPrefs.mergePresets(ctx.getApplicationContext(), json);
