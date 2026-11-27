@@ -102,16 +102,16 @@ public class ProbeActivity extends Activity {
             }
             Intent i = new Intent(CAMCAST_ACTION);
             i.setComponent(new ComponentName(CAMCAST_PKG, CAMCAST_CLASS));
-            if (getPackageManager().queryBroadcastReceivers(i, 0).isEmpty()) {
-                status.setText("CamCast 接收器未找到：确认 CamCast 已安装。\n\n"
-                    + PresetStore.summary(this));
-                return;
-            }
+            boolean found = !getPackageManager().queryBroadcastReceivers(i, 0).isEmpty();
             i.putExtra("presets_json", presets.toString());
-            sendBroadcast(i);
-            status.setText("已导出 " + presets.length() + " 个预设到 CamCast\n"
-                + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n"
-                + PresetStore.summary(this));
+            sendBroadcast(i); // 显式组件广播不受包可见性影响，查询结果仅作提示
+            String head = found
+                ? "已导出 " + presets.length() + " 个预设到 CamCast\n"
+                  + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n"
+                : "已尝试发送 " + presets.length() + " 个预设。\n"
+                  + "（未查询到 CamCast：确认已安装，且先打开过一次 CamCast 再导出——"
+                  + "被强停的应用收不到广播）\n\n";
+            status.setText(head + PresetStore.summary(this));
         } catch (Exception e) {
             status.setText("导出失败: " + e + "\n\n" + PresetStore.summary(this));
         }

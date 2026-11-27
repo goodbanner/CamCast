@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ 包可见性：不声明则 queryBroadcastReceivers 查不到 CamCast -->
+    <queries>
+        <package android:name="io.github.goodbanner.camcast" />
+    </queries>
+
     <application
         android:label="CamProbe"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
