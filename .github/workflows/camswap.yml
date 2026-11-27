@@ -24,10 +24,12 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Fetch Dobby (upstream git submodule, not vendored)
+      - name: Fetch Dobby (pinned commit from upstream git submodule)
         run: |
-          git clone --depth 1 https://github.com/jmpews/Dobby.git \
+          git clone https://github.com/jmpews/Dobby.git \
             camswap/app/src/main/cpp/third_party/Dobby
+          cd camswap/app/src/main/cpp/third_party/Dobby
+          git checkout cfb34699e3785d3b1bef962892fe986ff7f157aa
 
       - name: Install NDK 25.1.8937393 + CMake 3.22.1
         shell: bash
