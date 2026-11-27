@@ -397,6 +397,13 @@ public class Camera1Handler implements ICameraHandler {
         GLVideoRenderer.releaseSafely(HookMain.playerManager.c1_renderer_texture);
         GLVideoRenderer renderer = GLVideoRenderer.createSafely(HookMain.mSurface, "c1_texture_stream");
         HookMain.playerManager.c1_renderer_texture = renderer;
+        // Rotate the 16:9 stream to fill the portrait preview (same as local branch).
+        if (renderer != null && renderer.isInitialized()) {
+            int rotation = VideoManager.getConfig().getInt(
+                    ConfigManager.KEY_VIDEO_ROTATION_OFFSET, 0);
+            renderer.setRotation(rotation);
+            LogUtil.log("【CS】【Camera1】流模式渲染旋转设为 " + rotation + "°");
+        }
         android.view.Surface target =
                 (renderer != null && renderer.isInitialized()) ? renderer.getInputSurface() : HookMain.mSurface;
         HookMain.playerManager.initCamera1Stream(target);
