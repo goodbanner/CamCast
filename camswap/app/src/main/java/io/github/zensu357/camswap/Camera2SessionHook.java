@@ -221,6 +221,16 @@ public final class Camera2SessionHook {
         currentActivityClassName = activityClassName;
     }
 
+    /** Compatibility shim: upstream HookMain calls this on source switch but the
+     * published source tree lacks the method. Dropping the virtual surface is the
+     * intended effect so it is rebuilt against the new source. */
+    public void onCameraSourceChanged() {
+        try {
+            invalidateVirtualSurface();
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static boolean isWhatsAppPackage(String packageName) {
         return packageName != null && packageName.toLowerCase(Locale.ROOT).contains("whatsapp");
     }
