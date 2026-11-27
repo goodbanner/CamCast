@@ -1,5 +1,7 @@
 package io.github.zensu357.camswap;
 
+import io.github.zensu357.camswap.utils.VideoManager;
+
 /**
  * Compatibility shim: upstream release tarball references this class from
  * Camera1Handler / ConfigWatcher / HookMain / MediaPlayerManager / MicrophoneHandler
