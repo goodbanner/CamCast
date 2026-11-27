@@ -241,6 +241,48 @@ public final class MediaPlayerManager {
         }
     }
 
+    /**
+     * Camera1 texture-preview path (used by WeChat/JD scan): play a live stream
+     * through the shared ExoPlayerBackend into the provided GL renderer surface.
+     * Upstream only wired stream playback into Camera2; this method closes that gap.
+     */
+    void initCamera1Stream(Surface outputSurface) {
+        releaseStreamBackend();
+        MediaSourceDescriptor source = getMediaSource();
+        if (outputSurface == null || source == null || !source.isStream()) {
+            LogUtil.log("【CS】Camera1 流模式: 无输出 Surface 或非流源，跳过");
+            return;
+        }
+        try {
+            streamBackend = createStreamBackend();
+            streamBackend.setOutputSurface(outputSurface);
+            streamBackend.setVolume(VideoManager.getConfig().getBoolean(
+                    ConfigManager.KEY_PLAY_VIDEO_SOUND, false) ? 1.0f : 0f);
+            streamBackend.setLooping(false);
+            streamBackend.setListener(new SurfacePlayerBackend.Listener() {
+                @Override public void onReady() {
+                    LogUtil.log("【CS】Camera1 流播放器就绪");
+                }
+                @Override public void onError(String message, Throwable cause) {
+                    LogUtil.log("【CS】Camera1 流播放器错误: " + message
+                            + (cause != null ? " " + cause : ""));
+                }
+                @Override public void onDisconnected() {
+                    LogUtil.log("【CS】Camera1 流断开");
+                }
+                @Override public void onReconnected() {
+                    LogUtil.log("【CS】Camera1 流重连成功");
+                }
+                @Override public void onCompletion() {
+                }
+            });
+            streamBackend.open(source);
+            LogUtil.log("【CS】Camera1 流模式启动: " + source.streamUrl);
+        } catch (Exception e) {
+            LogUtil.log("【CS】Camera1 流模式初始化失败: " + android.util.Log.getStackTraceString(e));
+        }
+    }
+
     private SurfacePlayerBackend createStreamBackend() {
         // Try to create ExoPlayerBackend via reflection to avoid hard compile dependency
         // when Media3 is not on classpath (should not happen with proper gradle setup)

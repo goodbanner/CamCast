@@ -322,6 +322,15 @@ public class Camera1Handler implements ICameraHandler {
             HookMain.mSurface = new Surface(HookMain.mSurfacetexture);
         }
 
+        // ---- Stream mode: route ExoPlayerBackend into the Camera1 texture GL renderer ----
+        // Upstream bug: the legacy MediaPlayer.setDataSource(path) path below cannot play
+        // RTSP/RTMP URLs and crashes with NPE when getCurrentVideoPath() returns null
+        // (provider-backed video). Use the shared stream backend instead.
+        if (VideoManager.isStreamMode()) {
+            prepareTexturePreviewStream();
+            return;
+        }
+
         if (HookMain.playerManager.mMediaPlayer == null) {
             HookMain.playerManager.mMediaPlayer = new MediaPlayer();
         } else {
@@ -378,6 +387,20 @@ public class Camera1Handler implements ICameraHandler {
         } catch (Exception e) {
             LogUtil.e("【CS】【Camera1】mMediaPlayer prepare 异常: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Stream-mode variant of prepareTexturePreviewPlayer: render the live stream
+     * into the Camera1 texture preview via the shared ExoPlayerBackend.
+     */
+    private void prepareTexturePreviewStream() {
+        GLVideoRenderer.releaseSafely(HookMain.playerManager.c1_renderer_texture);
+        GLVideoRenderer renderer = GLVideoRenderer.createSafely(HookMain.mSurface, "c1_texture_stream");
+        HookMain.playerManager.c1_renderer_texture = renderer;
+        android.view.Surface target =
+                (renderer != null && renderer.isInitialized()) ? renderer.getInputSurface() : HookMain.mSurface;
+        HookMain.playerManager.initCamera1Stream(target);
+        LogUtil.log("【CS】【Camera1】流模式预览已接到 renderer");
     }
 
     private boolean handlePhotoFake(Camera camera, Object[] args) {

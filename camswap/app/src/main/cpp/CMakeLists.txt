@@ -35,3 +35,22 @@ target_link_libraries(camswap-native-hook
     OpenSLES
 )
 
+# Android 15+ 16 KB page-size compatibility: ensure all LOAD segments are
+# aligned to 16 KB. Applies to our .so and the statically linked Dobby objects.
+target_link_options(camswap-native-hook PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,-z,common-page-size=16384"
+)
+if(TARGET dobby)
+    target_link_options(dobby PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384"
+    )
+endif()
+
+# Dobby's own assembly/objects may carry smaller alignment; bump its compile
+# and link flags too when the target exists.
+if(TARGET dobby)
+    target_compile_options(dobby PRIVATE "-fno-stack-protector")
+endif()
+
