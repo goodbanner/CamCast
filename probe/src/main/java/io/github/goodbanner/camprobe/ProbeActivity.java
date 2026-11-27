@@ -102,16 +102,39 @@ public class ProbeActivity extends Activity {
             }
             Intent i = new Intent(CAMCAST_ACTION);
             i.setComponent(new ComponentName(CAMCAST_PKG, CAMCAST_CLASS));
-            boolean found = !getPackageManager().queryBroadcastReceivers(i, 0).isEmpty();
             i.putExtra("presets_json", presets.toString());
-            sendBroadcast(i); // 显式组件广播不受包可见性影响，查询结果仅作提示
-            String head = found
-                ? "已导出 " + presets.length() + " 个预设到 CamCast\n"
-                  + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n"
-                : "已尝试发送 " + presets.length() + " 个预设。\n"
-                  + "（未查询到 CamCast：确认已安装，且先打开过一次 CamCast 再导出——"
-                  + "被强停的应用收不到广播）\n\n";
-            status.setText(head + PresetStore.summary(this));
+            boolean found = !getPackageManager().queryBroadcastReceivers(i, 0).isEmpty();
+
+            // 关键：stopped 状态（被划掉/强停）的应用收不到任何广播。
+            // 显式 startActivity 不受 stopped 限制：先拉起 CamCast 解除 stopped，再延迟投递。
+            boolean launched = false;
+            try {
+                Intent launch = new Intent();
+                launch.setClassName(CAMCAST_PKG, CAMCAST_PKG + ".MainActivity");
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(launch);
+                launched = true;
+            } catch (Exception ignored) {
+            }
+            status.setText("正在拉起 CamCast 并导出 " + presets.length() + " 个预设…");
+
+            final boolean fFound = found;
+            final boolean fLaunched = launched;
+            final int count = presets.length();
+            new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                sendBroadcast(i);
+                String head;
+                if (fLaunched) {
+                    head = "已导出 " + count + " 个预设（已拉起 CamCast，1 秒内应看到 Toast）\n"
+                        + "→ 预设名填目标包名 → 「加载预设」\n\n";
+                } else if (fFound) {
+                    head = "已导出 " + count + " 个预设到 CamCast\n"
+                        + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n";
+                } else {
+                    head = "已尝试发送 " + count + " 个预设（未查询到 CamCast：确认已安装）\n\n";
+                }
+                status.setText(head + PresetStore.summary(this));
+            }, 800);
         } catch (Exception e) {
             status.setText("导出失败: " + e + "\n\n" + PresetStore.summary(this));
         }
