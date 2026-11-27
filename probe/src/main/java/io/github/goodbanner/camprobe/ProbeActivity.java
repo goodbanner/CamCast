@@ -100,13 +100,17 @@ public class ProbeActivity extends Activity {
                     + PresetStore.summary(this));
                 return;
             }
+            // 推拉结合：拉起前【同步】广播（此刻本 app 在前台，不会被冻结，
+            // CamCast 活着时走快路径）；随后拉起 CamCast，其 onCreate 会反向
+            // 从 PresetProvider 拉取（覆盖 CamCast 处于 stopped/广播被丢的场景，
+            // 且 binder 查询会自动解冻本进程，不依赖任何延时定时器）。
             Intent i = new Intent(CAMCAST_ACTION);
             i.setComponent(new ComponentName(CAMCAST_PKG, CAMCAST_CLASS));
             i.putExtra("presets_json", presets.toString());
-            boolean found = !getPackageManager().queryBroadcastReceivers(i, 0).isEmpty();
-
-            // 关键：stopped 状态（被划掉/强停）的应用收不到任何广播。
-            // 显式 startActivity 不受 stopped 限制：先拉起 CamCast 解除 stopped，再延迟投递。
+            try {
+                sendBroadcast(i);
+            } catch (Exception ignored) {
+            }
             boolean launched = false;
             try {
                 Intent launch = new Intent();
@@ -116,25 +120,11 @@ public class ProbeActivity extends Activity {
                 launched = true;
             } catch (Exception ignored) {
             }
-            status.setText("正在拉起 CamCast 并导出 " + presets.length() + " 个预设…");
-
-            final boolean fFound = found;
-            final boolean fLaunched = launched;
-            final int count = presets.length();
-            new android.os.Handler(getMainLooper()).postDelayed(() -> {
-                sendBroadcast(i);
-                String head;
-                if (fLaunched) {
-                    head = "已导出 " + count + " 个预设（已拉起 CamCast，1 秒内应看到 Toast）\n"
-                        + "→ 预设名填目标包名 → 「加载预设」\n\n";
-                } else if (fFound) {
-                    head = "已导出 " + count + " 个预设到 CamCast\n"
-                        + "→ 打开 CamCast，预设名填目标包名，点「加载预设」\n\n";
-                } else {
-                    head = "已尝试发送 " + count + " 个预设（未查询到 CamCast：确认已安装）\n\n";
-                }
-                status.setText(head + PresetStore.summary(this));
-            }, 800);
+            String head = launched
+                ? "已导出 " + presets.length() + " 个预设（已拉起 CamCast，进入页面自动导入）\n"
+                  + "→ 预设名填目标包名 → 「加载预设」\n\n"
+                : "已发送 " + presets.length() + " 个预设（CamCast 未拉起，打开它即自动导入）\n\n";
+            status.setText(head + PresetStore.summary(this));
         } catch (Exception e) {
             status.setText("导出失败: " + e + "\n\n" + PresetStore.summary(this));
         }

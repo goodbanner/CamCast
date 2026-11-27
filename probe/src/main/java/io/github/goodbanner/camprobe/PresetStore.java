@@ -154,4 +154,19 @@ public class PresetStore {
         }
         return sb.length() == 0 ? "（暂无探测数据）" : sb.toString().trim();
     }
+
+    private static final String DEFAULT_URL = "rtmp://192.168.1.50/live/cam";
+
+    /** 导出时用户填的推流地址，供 PresetProvider 拉取时使用。 */
+    public static void saveExportUrl(Context c, String url) {
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString("export_url", url == null || url.isEmpty() ? DEFAULT_URL : url)
+            .apply();
+    }
+
+    public static String loadExportUrl(Context c) {
+        String u = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("export_url", "");
+        return u == null || u.isEmpty() ? DEFAULT_URL : u;
+    }
 }

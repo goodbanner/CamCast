@@ -15,6 +15,11 @@
             android:value="Probe camera parameters (size/format/fps/id) requested by target apps" />
         <meta-data android:name="xposedminversion" android:value="53" />
 
+        <provider
+            android:name=".PresetProvider"
+            android:authorities="io.github.goodbanner.camprobe.provider"
+            android:exported="true" />
+
         <receiver
             android:name=".PresetReceiver"
             android:exported="true">

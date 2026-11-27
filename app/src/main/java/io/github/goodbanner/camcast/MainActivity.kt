@@ -73,6 +73,9 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.2f))
         setContentView(root)
 
+        // 反向拉取 CamProbe 预设（与广播互补，覆盖广播被 stopped/冻结丢弃的场景）
+        PresetPull.pullAsync(this)
+
         engine = StreamEngine(glView) { msg ->
             status.text = msg
             btnStream.text = if (engine.streaming) "停止推流" else "开始推流"
